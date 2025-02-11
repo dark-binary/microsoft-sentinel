@@ -1,0 +1,224 @@
+{
+    "$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "location": {
+            "defaultValue": "[resourceGroup().location]",
+            "minLength": 1,
+            "type": "String",
+            "metadata": {
+                "description": "Not used, but needed to pass arm-ttk test `Location-Should-Not-Be-Hardcoded`.  We instead use the `workspace-location` which is derived from the LA workspace"
+            }
+        },
+        "workspace-location": {
+            "defaultValue": "",
+            "type": "String",
+            "metadata": {
+                "description": "[concat('Region to deploy solution resources -- separate from location selection',parameters('location'))]"
+            }
+        },
+        "subscription": {
+            "defaultValue": "[last(split(subscription().id, '/'))]",
+            "type": "String",
+            "metadata": {
+                "description": "subscription id where Microsoft Sentinel is setup"
+            }
+        },
+        "resourceGroupName": {
+            "defaultValue": "[resourceGroup().name]",
+            "type": "String",
+            "metadata": {
+                "description": "resource group name where Microsoft Sentinel is setup"
+            }
+        },
+        "workspace": {
+            "defaultValue": "",
+            "type": "String",
+            "metadata": {
+                "description": "Workspace name for Log Analytics where Microsoft Sentinel is setup"
+            }
+        },
+        "logAnalyticsTableName": {
+            "defaultValue": "MicrosoftGraphActivityLogs_CL",
+            "type": "String",
+            "metadata": {
+                "description": "New custom table's name"
+            }
+        }
+    },
+    "resources": [
+        {
+            "name": "[concat(parameters('workspace'), '/' , parameters('logAnalyticsTableName'))]",
+            "type": "Microsoft.OperationalInsights/workspaces/tables",
+            "apiVersion": "2023-01-01-preview",
+            "properties": {
+                "totalRetentionInDays": 365,
+                "archiveRetentionInDays": 335,
+                "plan": "Auxiliary",
+                "schema": {
+                    "tableSubType": "DataCollectionRuleBased",
+                    "name": "[parameters('logAnalyticsTableName')]",
+                    "tableType": "CustomLog",
+                    "columns": [
+                        {
+                            "name": "TimeGenerated",
+                            "type": "datetime",
+                            "isDefaultDisplay": false,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "Location",
+                            "type": "string",
+                            "isDefaultDisplay": false,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "RequestId",
+                            "type": "string",
+                            "isDefaultDisplay": false,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "OperationId",
+                            "type": "string",
+                            "isDefaultDisplay": false,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "ClientRequestId",
+                            "type": "string",
+                            "isDefaultDisplay": false,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "ApiVersion",
+                            "type": "string",
+                            "isDefaultDisplay": false,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "RequestMethod",
+                            "type": "string",
+                            "isDefaultDisplay": false,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "ResponseStatusCode",
+                            "type": "int",
+                            "isDefaultDisplay": false,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "AadTenantId",
+                            "type": "string",
+                            "isDefaultDisplay": false,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "IPAddress",
+                            "type": "string",
+                            "isDefaultDisplay": false,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "UserAgent",
+                            "type": "string",
+                            "isDefaultDisplay": false,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "RequestUri",
+                            "type": "string",
+                            "isDefaultDisplay": false,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "DurationMs",
+                            "type": "int",
+                            "isDefaultDisplay": false,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "ResponseSizeBytes",
+                            "type": "int",
+                            "isDefaultDisplay": false,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "SignInActivityId",
+                            "type": "string",
+                            "isDefaultDisplay": false,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "Roles",
+                            "type": "string",
+                            "isDefaultDisplay": false,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "TokenIssuedAt",
+                            "type": "datetime",
+                            "isDefaultDisplay": false,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "AppId",
+                            "type": "string",
+                            "isDefaultDisplay": false,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "UserId",
+                            "type": "string",
+                            "isDefaultDisplay": false,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "ServicePrincipalId",
+                            "type": "string",
+                            "isDefaultDisplay": false,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "Scopes",
+                            "type": "string",
+                            "isDefaultDisplay": false,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "IdentityProvider",
+                            "type": "string",
+                            "isDefaultDisplay": false,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "ClientAuthMethod",
+                            "type": "int",
+                            "isDefaultDisplay": false,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "Wids",
+                            "type": "string",
+                            "isDefaultDisplay": false,
+                            "isHidden": false
+                        }
+                    ],
+                    "standardColumns": [
+                        {
+                            "name": "TenantId",
+                            "type": "guid",
+                            "isDefaultDisplay": false,
+                            "isHidden": false
+                        }
+                    ],
+                    "solutions": [
+                        "LogManagement"
+                    ],
+                    "isTroubleshootingAllowed": true
+                }
+            }
+        }
+    ]
+}
