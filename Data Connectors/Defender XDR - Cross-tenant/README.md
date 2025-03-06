@@ -36,7 +36,7 @@ Before you can deploy this solution, ensure that you have the following:
 ### Option 2: Easy Deploy
 Click the button below to quickly deploy this solution to your Azure subscription.
 
-[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri=https://raw.githubusercontent.com/dark-binary/microsoft-sentinel/main/Data%20Connectors/Defender%20XDR%20-%2Cross-tenant/maintemplate.json)
+[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri=https://raw.githubusercontent.com/dark-binary/microsoft-sentinel/main/Data%20Connectors/Defender%20XDR%20-%20Cross-tenant/maintemplate.json)
 
 
 ## Verify Deployment
