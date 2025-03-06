@@ -1,0 +1,963 @@
+{
+    "$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "location": {
+            "defaultValue": "[resourceGroup().location]",
+            "minLength": 1,
+            "type": "String"
+        },
+        "workspace-location": {
+            "defaultValue": "",
+            "type": "String",
+            "metadata": {
+                "description": "[concat('Region to deploy solution resources -- separate from location selection',parameters('location'))]"
+            }
+        },
+        "subscription": {
+            "defaultValue": "[last(split(subscription().id, '/'))]",
+            "type": "String",
+            "metadata": {
+                "description": "subscription id where Microsoft Sentinel is setup"
+            }
+        },
+        "resourceGroupName": {
+            "defaultValue": "[resourceGroup().name]",
+            "type": "String",
+            "metadata": {
+                "description": "reaource group name where Microsoft Sentinel is setup"
+            }
+        },
+        "workspace": {
+            "defaultValue": "",
+            "type": "String",
+            "metadata": {
+                "description": "Workspace name for Log Analytics where Microsoft Sentinel is setup"
+            }
+        }
+    },
+    "variables": {
+        "workspaceResourceId": "[resourceId('microsoft.OperationalInsights/Workspaces', parameters('workspace'))]",
+        "dataConnectorContentId": "DefenderXDRCustomDataConnector",
+        "dataConnectorTemplateSpecName": "[concat(parameters('workspace'),'-dc-',uniquestring(variables('dataConnectorContentId')))]",
+        "dataConnectorVersion": "1.0.0",
+        "logAnalyticsTableId1": "SecurityAlert_CL",
+        "logAnalyticsTableId2": "SecurityIncident_CL",
+        "dataCollectionEndpointName": "DefenderXDRDCE",
+        "dataCollectionRuleId": "DefenderXDRDCR",
+        "DefenderXdrStreamAlerts": "DefenderXdrStreamAlerts",
+        "DefenderXdrStreamIncidents": "DefenderXdrStreamIncidents"
+    },
+    "resources": [
+        {
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/',variables('dataConnectorContentId'))]",
+            "apiVersion": "2022-09-01-preview",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/dataConnectorDefinitions",
+            "location": "[parameters('workspace-location')]",
+            "kind": "Customizable",
+            "properties": {
+                "connectorUiConfig": {
+                    "id": "DefenderXDRCustomDataConnector",
+                    "title": "Defender XDR - Cross-tenant",
+                    "publisher": "Debac Manikandan",
+                    "descriptionMarkdown": "The Cross-tenant Defender XDR data connector allows ingesting logs from the Defender XDR platform (from any Tenant) into Microsoft Sentinel. The data connector is built on Microsoft Sentinel Codeless Connector Platform. It uses the Graph API to fetch logs and it supports DCR-based [ingestion time transformations](https://docs.microsoft.com/azure/azure-monitor/logs/custom-logs-overview) that parses the received security data into a custom table so that queries don't need to parse it again, thus resulting in better performance.",
+                    "graphQueries": [
+                        {
+                            "metricName": "Total Alerts received",
+                            "legend": "Defender XDR Alerts",
+                            "baseQuery": "SecurityAlert_CL"
+                        },
+                        {
+                            "metricName": "Total Incidents received",
+                            "legend": "Defender XDR Incidents",
+                            "baseQuery": "SecurityIncident_CL"
+                        }
+                    ],
+                    "sampleQueries": [
+                        {
+                            "description": "Get Sample of Defender XDR incidents",
+                            "query": "SecurityAlert_CL | take 10"
+                        },
+                        {
+                            "description": "Get Sample of Defender XDR alerts",
+                            "query": "SecurityIncident_CL | take 10"
+                        }
+                    ],
+                    "dataTypes": [
+                        {
+                            "name": "SecurityAlert_CL",
+                            "lastDataReceivedQuery": "SecurityAlert_CL\n       | where TimeGenerated > ago(12h)                | summarize Time = max(TimeGenerated)\n            | where isnotempty(Time)"
+                        },
+                        {
+                            "name": "SecurityIncident_CL",
+                            "lastDataReceivedQuery": "SecurityIncident_CL\n       | where TimeGenerated > ago(12h)                | summarize Time = max(TimeGenerated)\n            | where isnotempty(Time)"
+                        }
+                    ],
+                    "connectivityCriteria": [
+                        {
+                            "type": "HasDataConnectors",
+                            "value": null
+                        }
+                    ],
+                    "availability": {
+                        "status": 1,
+                        "isPreview": true
+                    },
+                    "permissions": {
+                        "tenant": null,
+                        "licenses": null,
+                        "resourceProvider": [
+                            {
+                                "provider": "Microsoft.OperationalInsights/workspaces",
+                                "permissionsDisplayText": "Read and Write permissions are required.",
+                                "providerDisplayName": "Workspace",
+                                "scope": "Workspace",
+                                "requiredPermissions": {
+                                    "read": true,
+                                    "write": true,
+                                    "delete": true,
+                                    "action": false
+                                }
+                            }
+                        ]
+                    },
+                    "instructionSteps": [
+                        {
+                            "instructions": [
+                                {
+                                    "type": "Markdown",
+                                    "parameters": {
+                                        "content": "#### 1. Create a Service Principal in Entra ID \n #### 2. Assign the Microsoft Graph permissions 'SecurityAlert.Read.All' and 'SecurityIncident.Read.All' to the Service Principal \n #### 3. Retrieve the tenant ID, client ID, and client secret of the Service Principal \n #### 4. Input the tenant ID, client ID, and client secret in the fields below \n #### 5. Click on the toggle button to connect to Defender XDR"
+                                    }
+                                },
+                                {
+                                    "type": "Textbox",
+                                    "parameters": {
+                                        "label": "Service Principal Tenant ID",
+                                        "placeholder": "Tenant ID",
+                                        "type": "text",
+                                        "name": "tenantId"
+                                    }
+                                },
+                                {
+                                    "type": "Textbox",
+                                    "parameters": {
+                                        "label": "Service Principal Client ID",
+                                        "placeholder": "Service Principal Client ID",
+                                        "type": "text",
+                                        "name": "clientId"
+                                    }
+                                },
+                                {
+                                    "type": "Textbox",
+                                    "parameters": {
+                                        "label": "Service Principal Client Secret",
+                                        "placeholder": "Service Principal Client Secret",
+                                        "type": "password",
+                                        "name": "clientSecret"
+                                    }
+                                },
+                                {
+                                    "parameters": {
+                                        "label": "toggle",
+                                        "name": "toggle"
+                                    },
+                                    "type": "ConnectionToggleButton"
+                                }
+                            ],
+                            "innerSteps": null
+                        }
+                    ],
+                    "isConnectivityCriteriasMatchSome": false
+                },
+                "connectionsConfig": {
+                    "templateSpecName": "[concat('/subscriptions/',parameters('subscription'),'/resourceGroups/',parameters('resourceGroupName'),'/providers/Microsoft.Resources/templateSpecs/',variables('dataConnectorTemplateSpecName'))]",
+                    "templateSpecVersion": "[variables('dataConnectorVersion')]"
+                }
+            }
+        },
+        {
+            "name": "[concat(parameters('workspace'), '/' , variables('logAnalyticsTableId1'))]",
+            "type": "Microsoft.OperationalInsights/workspaces/tables",
+            "apiVersion": "2021-12-01-preview",
+            "location": "[parameters('workspace-location')]",
+            "tags": {},
+            "properties": {
+                "plan": "Analytics",
+                "schema": {
+                    "name": "[variables('logAnalyticsTableId1')]",
+                    "columns": [
+                        {
+                            "name": "TimeGenerated",
+                            "type": "datetime",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "actorDisplayName",
+                            "type": "string",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "alertWebUrl",
+                            "type": "string",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "assignedTo",
+                            "type": "string",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "classification",
+                            "type": "string",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "comments",
+                            "type": "dynamic",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "createdDateTime",
+                            "type": "datetime",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "description",
+                            "type": "string",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "detectionSource",
+                            "type": "string",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "detectorId",
+                            "type": "string",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "determination",
+                            "type": "string",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "evidence",
+                            "type": "dynamic",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "firstActivityDateTime",
+                            "type": "datetime",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "id",
+                            "type": "string",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "incidentId",
+                            "type": "string",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "incidentWebUrl",
+                            "type": "string",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "lastActivityDateTime",
+                            "type": "datetime",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "lastUpdateDateTime",
+                            "type": "datetime",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "mitreTechniques",
+                            "type": "dynamic",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "providerAlertId",
+                            "type": "string",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "recommendedActions",
+                            "type": "string",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "resolvedDateTime",
+                            "type": "datetime",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "serviceSource",
+                            "type": "string",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "severity",
+                            "type": "string",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "status",
+                            "type": "string",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "systemTags",
+                            "type": "dynamic",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "AlertTenantId",
+                            "type": "string",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "threatDisplayName",
+                            "type": "string",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "threatFamilyName",
+                            "type": "string",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "AlertTitle",
+                            "type": "string",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        }
+                    ]
+                    
+                }
+            }
+        },
+        {
+            "name": "[concat(parameters('workspace'), '/' , variables('logAnalyticsTableId2'))]",
+            "type": "Microsoft.OperationalInsights/workspaces/tables",
+            "apiVersion": "2021-12-01-preview",
+            "location": "[parameters('workspace-location')]",
+            "tags": {},
+            "properties": {
+                "plan": "Analytics",
+                "schema": {
+                    "name": "[variables('logAnalyticsTableId2')]",
+                    "columns": [
+                        {
+                            "name": "TimeGenerated",
+                            "type": "datetime",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "assignedTo",
+                            "type": "string",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "classification",
+                            "type": "string",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "comments",
+                            "type": "dynamic",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "createdDateTime",
+                            "type": "datetime",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "customTags",
+                            "type": "dynamic",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "description",
+                            "type": "string",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "determination",
+                            "type": "string",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "displayName",
+                            "type": "string",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "id",
+                            "type": "string",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "incidentWebUrl",
+                            "type": "string",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "lastUpdateDateTime",
+                            "type": "datetime",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "redirectIncidentId",
+                            "type": "string",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "severity",
+                            "type": "string",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "status",
+                            "type": "string",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "summary",
+                            "type": "string",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "systemTags",
+                            "type": "dynamic",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "IncidentTenantId",
+                            "type": "string",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Insights/dataCollectionEndpoints",
+            "apiVersion": "2021-09-01-preview",
+            "name": "[variables('dataCollectionEndpointName')]",
+            "location": "[parameters('workspace-location')]",
+            "properties": {}
+        },
+        {
+            "name": "[variables('dataCollectionRuleId')]",
+            "apiVersion": "2021-09-01-preview",
+            "type": "Microsoft.Insights/dataCollectionRules",
+            "location": "[parameters('workspace-location')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Insights/dataCollectionEndpoints', variables('dataCollectionEndpointName'))]",
+                "[concat('subscriptions/', parameters('subscription'), '/resourceGroups/', parameters('resourceGroupName'), '/providers/Microsoft.OperationalInsights/workspaces/', parameters('workspace'), '/tables/', variables('logAnalyticsTableId1'))]",
+                "[concat('subscriptions/', parameters('subscription'), '/resourceGroups/', parameters('resourceGroupName'), '/providers/Microsoft.OperationalInsights/workspaces/', parameters('workspace'), '/tables/', variables('logAnalyticsTableId2'))]"
+            ],
+            "properties": {
+                "dataCollectionEndpointId": "[resourceId('Microsoft.Insights/dataCollectionEndpoints', variables('dataCollectionEndpointName'))]",
+                "streamDeclarations": {
+                    "[concat('Custom-', variables('DefenderXdrStreamAlerts'))]": {
+                        "columns": [
+                            {
+                                "name": "@odata.type",
+                                "type": "string",
+                                "description": ""
+                            },
+                            {
+                                "name": "actorDisplayName",
+                                "type": "string",
+                                "description": ""
+                            },
+                            {
+                                "name": "alertWebUrl",
+                                "type": "string",
+                                "description": ""
+                            },
+                            {
+                                "name": "assignedTo",
+                                "type": "string",
+                                "description": ""
+                            },
+                            {
+                                "name": "classification",
+                                "type": "string",
+                                "description": ""
+                            },
+                            {
+                                "name": "comments",
+                                "type": "dynamic",
+                                "description": ""
+                            },
+                            {
+                                "name": "createdDateTime",
+                                "type": "datetime",
+                                "description": ""
+                            },
+                            {
+                                "name": "description",
+                                "type": "string",
+                                "description": ""
+                            },
+                            {
+                                "name": "detectionSource",
+                                "type": "string",
+                                "description": ""
+                            },
+                            {
+                                "name": "detectorId",
+                                "type": "string",
+                                "description": ""
+                            },
+                            {
+                                "name": "determination",
+                                "type": "string",
+                                "description": ""
+                            },
+                            {
+                                "name": "evidence",
+                                "type": "dynamic",
+                                "description": ""
+                            },
+                            {
+                                "name": "firstActivityDateTime",
+                                "type": "datetime",
+                                "description": ""
+                            },
+                            {
+                                "name": "id",
+                                "type": "string",
+                                "description": ""
+                            },
+                            {
+                                "name": "incidentId",
+                                "type": "string",
+                                "description": ""
+                            },
+                            {
+                                "name": "incidentWebUrl",
+                                "type": "string",
+                                "description": ""
+                            },
+                            {
+                                "name": "lastActivityDateTime",
+                                "type": "datetime",
+                                "description": ""
+                            },
+                            {
+                                "name": "lastUpdateDateTime",
+                                "type": "datetime",
+                                "description": ""
+                            },
+                            {
+                                "name": "mitreTechniques",
+                                "type": "dynamic",
+                                "description": ""
+                            },
+                            {
+                                "name": "providerAlertId",
+                                "type": "string",
+                                "description": ""
+                            },
+                            {
+                                "name": "recommendedActions",
+                                "type": "string",
+                                "description": ""
+                            },
+                            {
+                                "name": "resolvedDateTime",
+                                "type": "datetime",
+                                "description": ""
+                            },
+                            {
+                                "name": "serviceSource",
+                                "type": "string",
+                                "description": ""
+                            },
+                            {
+                                "name": "severity",
+                                "type": "string",
+                                "description": ""
+                            },
+                            {
+                                "name": "status",
+                                "type": "string",
+                                "description": ""
+                            },
+                            {
+                                "name": "systemTags",
+                                "type": "dynamic",
+                                "description": ""
+                            },
+                            {
+                                "name": "tenantId",
+                                "type": "string",
+                                "description": ""
+                            },
+                            {
+                                "name": "threatDisplayName",
+                                "type": "string",
+                                "description": ""
+                            },
+                            {
+                                "name": "threatFamilyName",
+                                "type": "string",
+                                "description": ""
+                            },
+                            {
+                                "name": "title",
+                                "type": "string",
+                                "description": ""
+                            }
+                        ]
+                    },
+                    "[concat('Custom-', variables('DefenderXdrStreamIncidents'))]": {
+                        "columns": [
+                            {
+                                "name": "@odata.type",
+                                "type": "string",
+                                "description": ""
+                            },
+                            {
+                                "name": "assignedTo",
+                                "type": "string",
+                                "description": ""
+                            },
+                            {
+                                "name": "classification",
+                                "type": "string",
+                                "description": ""
+                            },
+                            {
+                                "name": "comments",
+                                "type": "dynamic",
+                                "description": ""
+                            },
+                            {
+                                "name": "createdDateTime",
+                                "type": "datetime",
+                                "description": ""
+                            },
+                            {
+                                "name": "customTags",
+                                "type": "dynamic",
+                                "description": ""
+                            },
+                            {
+                                "name": "description",
+                                "type": "string",
+                                "description": ""
+                            },
+                            {
+                                "name": "determination",
+                                "type": "string",
+                                "description": ""
+                            },
+                            {
+                                "name": "displayName",
+                                "type": "string",
+                                "description": ""
+                            },
+                            {
+                                "name": "id",
+                                "type": "string",
+                                "description": ""
+                            },
+                            {
+                                "name": "incidentWebUrl",
+                                "type": "string",
+                                "description": ""
+                            },
+                            {
+                                "name": "lastUpdateDateTime",
+                                "type": "datetime",
+                                "description": ""
+                            },
+                            {
+                                "name": "redirectIncidentId",
+                                "type": "string",
+                                "description": ""
+                            },
+                            {
+                                "name": "severity",
+                                "type": "string",
+                                "description": ""
+                            },
+                            {
+                                "name": "status",
+                                "type": "string",
+                                "description": ""
+                            },
+                            {
+                                "name": "summary",
+                                "type": "string",
+                                "description": ""
+                            },
+                            {
+                                "name": "systemTags",
+                                "type": "dynamic",
+                                "description": ""
+                            },
+                            {
+                                "name": "tenantId",
+                                "type": "string",
+                                "description": ""
+                            }
+                        ]
+                    }    
+                },
+                "destinations": {
+                    "logAnalytics": [
+                        {
+                            "workspaceResourceId": "[variables('workspaceResourceId')]",
+                            "name": "clv2ws1"
+                        }
+                    ]
+                },
+                "dataFlows": [
+                    {
+                        "streams": [
+                            "[concat('Custom-', variables('DefenderXdrStreamAlerts'))]"
+                        ],
+                        "destinations": [
+                            "clv2ws1"
+                        ],
+                        "transformKql": "source | extend TimeGenerated = now() | where createdDateTime > ago(1m) | project-away ['@odata.type'] | project-rename AlertTenantId = tenantId, AlertTitle = ['title']",
+                        "outputStream": "[concat('Custom-', variables('logAnalyticsTableId1'))]"
+                    },
+                    {
+                        "streams": [
+                            "[concat('Custom-', variables('DefenderXdrStreamIncidents'))]"
+                        ],
+                        "destinations": [
+                            "clv2ws1"
+                        ],
+                        "transformKql": "source | extend TimeGenerated = now() | where createdDateTime > ago(1m) | project-away ['@odata.type'] | project-rename IncidentTenantId = tenantId",
+                        "outputStream": "[concat('Custom-', variables('logAnalyticsTableId2'))]"
+                    }
+                ]
+            }
+        },
+        {
+            "type": "Microsoft.Resources/templateSpecs",
+            "apiVersion": "2021-05-01",
+            "name": "[variables('dataConnectorTemplateSpecName')]",
+            "location": "[parameters('workspace-location')]",
+            "tags": {
+                "hidden-sentinelWorkspaceId": "[variables('workspaceResourceId')]",
+                "hidden-sentinelContentType": "DataConnector"
+            },
+            "properties": {
+                "description": "Defender XDR Incident custom data connector template",
+                "displayName": "Defender XDR Incident template"
+            }
+        },
+        {
+            "type": "Microsoft.Resources/templateSpecs/versions",
+            "apiVersion": "2021-05-01",
+            "name": "[concat(variables('dataConnectorTemplateSpecName'),'/',variables('dataConnectorVersion'))]",
+            "location": "[parameters('workspace-location')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Resources/templateSpecs', variables('dataConnectorTemplateSpecName'))]",
+                "[resourceId('Microsoft.Insights/dataCollectionEndpoints', variables('dataCollectionEndpointName'))]",
+                "[resourceId('Microsoft.Insights/dataCollectionRules', variables('dataCollectionRuleId'))]"
+            ],
+            "tags": {
+                "hidden-sentinelWorkspaceId": "[variables('workspaceResourceId')]",
+                "hidden-sentinelContentType": "DataConnector"
+            },
+            "properties": {
+                "description": "Defender XDR Incident data connector Template Spec version",
+                "mainTemplate": {
+                    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+                    "contentVersion": "[variables('dataConnectorVersion')]",
+                    "parameters": {
+                        "tenantId": {
+                            "defaultValue": "-NA-",
+                            "type": "string",
+                            "minLength": 1,
+                            "metadata": {
+                                "description": "Tenant ID from which the alerts and incidents are to be fetched"
+                            }
+                        },
+                        "clientId": {
+                            "defaultValue": "-NA-",
+                            "type": "string",
+                            "minLength": 1,
+                            "metadata": {
+                                "description": "Service Principal Client ID"
+                            }
+                        },
+                        "clientSecret": {
+                            "defaultValue": "-NA-",
+                            "type": "string",
+                            "minLength": 1,
+                            "metadata": {
+                                "description": "Service Principal Client Secret"
+                            }
+                        },
+                        "connectorDefinitionName": {
+                            "defaultValue": "Defender XDR - Custom Data Connector",
+                            "type": "string",
+                            "minLength": 1,
+                            "metadata": {
+                                "description": "connectorDefinitionName"
+                            }
+                        },
+                        "workspace": {
+                            "defaultValue": "[parameters('workspace')]",
+                            "type": "string"
+                        },
+                        "dataCollectionEndpointName": {
+                            "defaultValue": "[variables('dataCollectionEndpointName')]",
+                            "type": "string"
+                        },
+                        "dataCollectionRuleId": {
+                            "defaultValue": "[variables('dataCollectionRuleId')]",
+                            "type": "string"
+                        }
+                    },
+                    "variables": {},
+                    "resources": [
+                        {
+                            "type": "Microsoft.OperationalInsights/workspaces/providers/dataConnectors",
+                            "apiVersion": "2021-10-01-preview",
+                            "name": "[[concat(parameters('workspace'),'/Microsoft.SecurityInsights/', 'DefenderXDRAlerts')]",
+                            "location": "[parameters('workspace-location')]",
+                            "kind": "RestApiPoller",
+                            "properties": {
+                                "connectorDefinitionName": "[[parameters('connectorDefinitionName')]",
+                                "dataType": "[variables('logAnalyticsTableId1')]",
+                                "auth": {
+                                    "type": "OAuth2",
+                                    "grantType": "client_credentials",
+                                    "ClientId": "[[parameters('clientId')]",
+                                    "ClientSecret": "[[parameters('clientSecret')]",
+                                    "tokenEndpoint": "[[concat('https://login.microsoftonline.com/', parameters('tenantId') , '/oauth2/v2.0/token')]",
+                                    "tokenEndpointHeaders": {
+                                        "Accept": "application/json",
+                                        "Content-Type": "application/x-www-form-urlencoded"
+                                    },
+                                    "scope": "https://graph.microsoft.com/.default"
+                                },
+                                "request": {
+                                    "apiEndpoint": "https://graph.microsoft.com/v1.0/security/alerts_v2",
+                                    "httpMethod": "Get",
+                                    "queryTimeFormat": "yyyy-MM-ddTHH:mm:ssZ",
+                                    "queryWindowInMin": 1
+                                },
+                                "response": {
+                                    "eventsJsonPaths": [
+                                        "$..value"
+                                    ]
+                                },
+                                "dcrConfig": {
+                                    "streamName": "[concat('Custom-',variables('DefenderXdrStreamAlerts'))]",
+                                    "dataCollectionEndpoint": "[[reference(resourceId('Microsoft.Insights/dataCollectionEndpoints', parameters('dataCollectionEndpointName')), '2021-09-01-preview').logsIngestion.endpoint]",
+                                    "dataCollectionRuleImmutableId": "[[reference(resourceId('Microsoft.Insights/dataCollectionRules', parameters('dataCollectionRuleId')), '2021-09-01-preview').immutableId]"
+                                }
+                            }
+                        },
+                        {
+                            "type": "Microsoft.OperationalInsights/workspaces/providers/dataConnectors",
+                            "apiVersion": "2021-10-01-preview",
+                            "name": "[[concat(parameters('workspace'),'/Microsoft.SecurityInsights/', 'DefenderXDRIncidents')]",
+                            "location": "[parameters('workspace-location')]",
+                            "kind": "RestApiPoller",
+                            "properties": {
+                                "connectorDefinitionName": "[[parameters('connectorDefinitionName')]",
+                                "dataType": "[variables('logAnalyticsTableId2')]",
+                                "auth": {
+                                    "type": "OAuth2",
+                                    "grantType": "client_credentials",
+                                    "ClientId": "[[parameters('clientId')]",
+                                    "ClientSecret": "[[parameters('clientSecret')]",
+                                    "tokenEndpoint": "[[concat('https://login.microsoftonline.com/', parameters('tenantId') , '/oauth2/v2.0/token')]",
+                                    "tokenEndpointHeaders": {
+                                        "Accept": "application/json",
+                                        "Content-Type": "application/x-www-form-urlencoded"
+                                    },
+                                    "scope": "https://graph.microsoft.com/.default"
+                                },
+                                "request": {
+                                    "apiEndpoint": "https://graph.microsoft.com/v1.0/security/incidents",
+                                    "httpMethod": "Get",
+                                    "queryTimeFormat": "yyyy-MM-ddTHH:mm:ssZ",
+                                    "queryWindowInMin": 1
+                                },
+                                "response": {
+                                    "eventsJsonPaths": [
+                                        "$..value"
+                                    ]
+                                },
+                                "dcrConfig": {
+                                    "streamName": "[concat('Custom-',variables('DefenderXdrStreamIncidents'))]",
+                                    "dataCollectionEndpoint": "[[reference(resourceId('Microsoft.Insights/dataCollectionEndpoints', parameters('dataCollectionEndpointName')), '2021-09-01-preview').logsIngestion.endpoint]",
+                                    "dataCollectionRuleImmutableId": "[[reference(resourceId('Microsoft.Insights/dataCollectionRules', parameters('dataCollectionRuleId')), '2021-09-01-preview').immutableId]"
+                                }
+                            }
+                        }
+                    ]
+                }
+            }
+        }
+    ]
+}
