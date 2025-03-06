@@ -37,6 +37,14 @@ Once the deployment is complete, verify that the Codeless Connector has been suc
 ## Configuration
 Once the connector is deployed, you'll need to configure it to connect to your Defender XDR instance from a different tenant. This typically involves providing service principal (app registration) credentials for cross-tenant data ingestion. Check the data connector page for more instructions.
 
+## Known Limitations
+- The data connector can run only every 1 minute (minimum)
+- The Graph API only supports 50 results per request. If you have an environment that creates more than 50 alerts or incidents per minute, the data connector wouldn't be able to collect all alerts and incidents.
+    - and if your environment creates 50 alerts or incidents per minute, there's something fundamentally wrong with your Defender XDR platform 🤷🏻‍♂️
+- The collected alerts and incidents are ingested in custom tables (and not in the native SecurityAlert or SecurityIncident table)
+- The schema of the collected alert (SecurityAlert_CL) is NOT the same as the alert log you see in the native table (SecurityAlert). This is an issue due to the difference in response schema from Microsoft's Graph API.
+- The schema of the collected alert (SecurityIncident_CL) is NOT the same as the alert log you see in the native table (SecurityIncident). This is an issue due to the difference in response schema from Microsoft's Graph API.
+
 ## Troubleshooting
 - If you encounter any issues during deployment or configuration, refer to the Azure Activity Log for detailed error messages.
 - Ensure that the necessary permissions and admin consent have been granted for the app registration.
