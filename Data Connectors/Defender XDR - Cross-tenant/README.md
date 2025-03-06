@@ -19,8 +19,6 @@ Before you can deploy this solution, ensure that you have the following:
 
 ## Deployment Steps
 
-### Option 1: Deploy using Template Specs
-
 1. Go to the [Azure Portal](https://portal.azure.com/)
 2. In the top search bar, search for **"Template Specs"**
 3. Click **"Template Specs"**
@@ -31,12 +29,6 @@ Before you can deploy this solution, ensure that you have the following:
 8. Open the newly create Template spec
 9. Click the **"Deploy"** button, and provide the appropriate inputs
 10. Click **"Review + Create"** and then **"Create"** to deploy.
-
-
-### Option 2: Easy Deploy
-Click the button below to quickly deploy this solution to your Azure subscription.
-
-[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri=https://raw.githubusercontent.com/dark-binary/microsoft-sentinel/main/Data%20Connectors/Defender%20XDR%20-%20Cross-tenant/maintemplate.json)
 
 
 ## Verify Deployment
