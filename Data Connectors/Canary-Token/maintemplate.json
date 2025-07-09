@@ -1,0 +1,535 @@
+{
+    "$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "location": {
+            "defaultValue": "[resourceGroup().location]",
+            "minLength": 1,
+            "type": "String"
+        },
+        "workspace-location": {
+            "defaultValue": "",
+            "type": "String",
+            "metadata": {
+                "description": "[concat('Region to deploy solution resources -- separate from location selection',parameters('location'))]"
+            }
+        },
+        "subscription": {
+            "defaultValue": "[last(split(subscription().id, '/'))]",
+            "type": "String",
+            "metadata": {
+                "description": "subscription id where Microsoft Sentinel is setup"
+            }
+        },
+        "resourceGroupName": {
+            "defaultValue": "[resourceGroup().name]",
+            "type": "String",
+            "metadata": {
+                "description": "reaource group name where Microsoft Sentinel is setup"
+            }
+        },
+        "workspace": {
+            "defaultValue": "",
+            "type": "String",
+            "metadata": {
+                "description": "Workspace name for Log Analytics where Microsoft Sentinel is setup"
+            }
+        }
+    },
+    "variables": {
+        "workspaceResourceId": "[resourceId('microsoft.OperationalInsights/Workspaces', parameters('workspace'))]",
+        "dataConnectorContentId": "CanaryIncidentConnector",
+        "dataConnectorTemplateSpecName": "[concat(parameters('workspace'),'-dc-',uniquestring(variables('dataConnectorContentId')))]",
+        "dataConnectorVersion": "1.0.0",
+        "logAnalyticsTableId": "CanaryIncident_CL",
+        "dataCollectionEndpointName": "CanaryIncidentDCE",
+        "dataCollectionRuleId": "CanaryIncidentDCR",
+        "CanaryIncidentStream": "CanaryIncidentStream"
+    },
+    "resources": [
+        {
+            "name": "[concat(parameters('workspace'),'/Microsoft.SecurityInsights/',variables('dataConnectorContentId'))]",
+            "apiVersion": "2022-09-01-preview",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/dataConnectorDefinitions",
+            "location": "[parameters('workspace-location')]",
+            "kind": "Customizable",
+            "properties": {
+                "connectorUiConfig": {
+                    "id": "CanaryIncidentConnector",
+                    "title": "Canary Incidents",
+                    "publisher": "Debac Manikandan",
+                    "descriptionMarkdown": "This data connector allows you to connect to Canary Portal to collect incidents and ingest them into Microsoft Sentinel. It uses a REST API poller to fetch incidents from the Canary service and store them in a custom log analytics table.",
+                    "graphQueries": [
+                        {
+                            "metricName": "Total Incidents received",
+                            "legend": "Canary Incidents",
+                            "baseQuery": "CanaryIncident_CL"
+                        }
+                    ],
+                    "sampleQueries": [
+                        {
+                            "description": "This query returns the latest 10 incidents from Canary.",
+                            "query": "CanaryIncident_CL | take 10"
+                        }
+                    ],
+                    "dataTypes": [
+                        {
+                            "name": "CanaryIncident_CL",
+                            "lastDataReceivedQuery": "CanaryIncident_CL\n       | where TimeGenerated > ago(12h)                | summarize Time = max(TimeGenerated)\n            | where isnotempty(Time)"
+                        }
+                    ],
+                    "connectivityCriteria": [
+                        {
+                            "type": "HasDataConnectors",
+                            "value": null
+                        }
+                    ],
+                    "availability": {
+                        "status": 1,
+                        "isPreview": true
+                    },
+                    "permissions": {
+                        "tenant": null,
+                        "licenses": null,
+                        "resourceProvider": [
+                            {
+                                "provider": "Microsoft.OperationalInsights/workspaces",
+                                "permissionsDisplayText": "Read and Write permissions are required.",
+                                "providerDisplayName": "Workspace",
+                                "scope": "Workspace",
+                                "requiredPermissions": {
+                                    "read": true,
+                                    "write": true,
+                                    "delete": true,
+                                    "action": false
+                                }
+                            }
+                        ]
+                    },
+                    "instructionSteps": [
+                        {
+                            "instructions": [
+                                {
+                                    "type": "Markdown",
+                                    "parameters": {
+                                        "content": "#### 1. Enter the Organization ID of your Canary portal\n\n For example, `<organizationid>.canary.tools` is the URL of your Canary portal without the `https://` prefix. Enter ONLY the organization ID, not the full URL. \n\n#### 2. Enter the API Token for your Canary portal. \n\n#### 3. Click on **Connect** to establish the connection to your Canary portal."
+                                    }
+                                },
+                                {
+                                    "type": "Textbox",
+                                    "parameters": {
+                                        "label": "Organization ID",
+                                        "placeholder": "Organization ID",
+                                        "type": "text",
+                                        "name": "organizationId"
+                                    }
+                                },
+                                {
+                                    "type": "Textbox",
+                                    "parameters": {
+                                        "label": "API Token",
+                                        "placeholder": "API Token",
+                                        "type": "password",
+                                        "name": "apiToken"
+                                    }
+                                },
+                                {
+                                    "parameters": {
+                                        "label": "toggle",
+                                        "name": "toggle"
+                                    },
+                                    "type": "ConnectionToggleButton"
+                                }
+                            ],
+                            "innerSteps": null
+                        }
+                    ],
+                    "isConnectivityCriteriasMatchSome": false
+                },
+                "connectionsConfig": {
+                    "templateSpecName": "[concat('/subscriptions/',parameters('subscription'),'/resourceGroups/',parameters('resourceGroupName'),'/providers/Microsoft.Resources/templateSpecs/',variables('dataConnectorTemplateSpecName'))]",
+                    "templateSpecVersion": "[variables('dataConnectorVersion')]"
+                }
+            }
+        },
+        {
+            "name": "[concat(parameters('workspace'), '/' , variables('logAnalyticsTableId'))]",
+            "type": "Microsoft.OperationalInsights/workspaces/tables",
+            "apiVersion": "2021-12-01-preview",
+            "location": "[parameters('workspace-location')]",
+            "tags": {},
+            "properties": {
+                "plan": "Analytics",
+                "schema": {
+                    "name": "[variables('logAnalyticsTableId')]",
+                    "columns": [
+                        {
+                            "name": "TimeGenerated",
+                            "type": "datetime",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "Acknowledged",
+                            "type": "string",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "Created",
+                            "type": "string",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "CreatedStd",
+                            "type": "datetime",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "Description",
+                            "type": "string",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "DstHost",
+                            "type": "string",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "DstPort",
+                            "type": "int",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "Events",
+                            "type": "dynamic",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "EventsCount",
+                            "type": "int",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "EventsList",
+                            "type": "string",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "FlockId",
+                            "type": "string",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "FlockName",
+                            "type": "string",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "LocalTime",
+                            "type": "datetime",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "LogType",
+                            "type": "int",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "MatchedAnnotations",
+                            "type": "dynamic",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "Memo",
+                            "type": "string",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "Name",
+                            "type": "string",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "NodeId",
+                            "type": "string",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "Notified",
+                            "type": "string",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "SrcHost",
+                            "type": "string",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "SrcPort",
+                            "type": "int",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "HashId",
+                            "type": "string",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "IncidentId",
+                            "type": "string",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "Summary",
+                            "type": "string",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "Updated",
+                            "type": "string",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "UpdatedId",
+                            "type": "int",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "UpdatedStd",
+                            "type": "datetime",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        },
+                        {
+                            "name": "UpdatedTime",
+                            "type": "string",
+                            "isDefaultDisplay": true,
+                            "isHidden": false
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Insights/dataCollectionEndpoints",
+            "apiVersion": "2021-09-01-preview",
+            "name": "[variables('dataCollectionEndpointName')]",
+            "location": "[parameters('workspace-location')]",
+            "properties": {}
+        },
+        {
+            "name": "[variables('dataCollectionRuleId')]",
+            "apiVersion": "2021-09-01-preview",
+            "type": "Microsoft.Insights/dataCollectionRules",
+            "location": "[parameters('workspace-location')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Insights/dataCollectionEndpoints', variables('dataCollectionEndpointName'))]",
+                "[concat('subscriptions/', parameters('subscription'), '/resourceGroups/', parameters('resourceGroupName'), '/providers/Microsoft.OperationalInsights/workspaces/', parameters('workspace'), '/tables/', variables('logAnalyticsTableId'))]"
+            ],
+            "properties": {
+                "dataCollectionEndpointId": "[resourceId('Microsoft.Insights/dataCollectionEndpoints', variables('dataCollectionEndpointName'))]",
+                "streamDeclarations": {
+                    "[concat('Custom-', variables('CanaryIncidentStream'))]": {
+                        "columns": [
+                            {
+                                "name": "description",
+                                "type": "dynamic",
+                                "description": ""
+                            },
+                            {
+                                "name": "hash_id",
+                                "type": "string",
+                                "description": ""
+                            },
+                            {
+                                "name": "id",
+                                "type": "string",
+                                "description": ""
+                            },
+                            {
+                                "name": "summary",
+                                "type": "string",
+                                "description": ""
+                            },
+                            {
+                                "name": "updated",
+                                "type": "string",
+                                "description": ""
+                            },
+                            {
+                                "name": "updated_id",
+                                "type": "int",
+                                "description": ""
+                            },
+                            {
+                                "name": "updated_std",
+                                "type": "datetime",
+                                "description": ""
+                            },
+                            {
+                                "name": "updated_time",
+                                "type": "string",
+                                "description": ""
+                            }
+                        ]
+                    }
+                },
+                "destinations": {
+                    "logAnalytics": [
+                        {
+                            "workspaceResourceId": "[variables('workspaceResourceId')]",
+                            "name": "clv2ws1"
+                        }
+                    ]
+                },
+                "dataFlows": [
+                    {
+                        "streams": [
+                            "[concat('Custom-', variables('CanaryIncidentStream'))]"
+                        ],
+                        "destinations": [
+                            "clv2ws1"
+                        ],
+                        "transformKql": "source | extend TimeGenerated = now(), Acknowledged = tostring(description.acknowledged), Created = tostring(description.created), CreatedStd = todatetime(description.created), Description = tostring(description.description), DstHost = tostring(description.dst_host), DstPort = toint(description.dst_port), Events = description.events, EventsCount = toint(description.events_count), EventsList = tostring(description.events_list), FlockId = tostring(description.flock_id), FlockName = tostring(description.flock_name), LocalTime = todatetime(description.local_time), LogType = toint(description.logtype), MatchedAnnotations = description.matched_annotations, Memo = tostring(description.memo), Name = tostring(description.name), NodeId = tostring(description.node_id), Notified = tostring(description.notified), SrcHost = tostring(description.src_host), SrcPort = toint(description.src_port) | project-rename HashId = hash_id, IncidentId = id, Summary = summary, Updated = updated, UpdatedId = updated_id, UpdatedStd = updated_std, UpdatedTime = updated_time | project TimeGenerated, Acknowledged, Created, CreatedStd, Description, DstHost, DstPort, Events, EventsCount, EventsList, FlockId, FlockName, LocalTime, LogType, MatchedAnnotations, Memo, Name, NodeId, Notified, SrcHost, SrcPort, HashId, IncidentId, Summary, Updated, UpdatedId, UpdatedStd, UpdatedTime",
+                        "outputStream": "[concat('Custom-', variables('logAnalyticsTableId'))]"
+                    }
+                ]
+            }
+        },
+        {
+            "type": "Microsoft.Resources/templateSpecs",
+            "apiVersion": "2021-05-01",
+            "name": "[variables('dataConnectorTemplateSpecName')]",
+            "location": "[parameters('workspace-location')]",
+            "tags": {
+                "hidden-sentinelWorkspaceId": "[variables('workspaceResourceId')]",
+                "hidden-sentinelContentType": "DataConnector"
+            },
+            "properties": {
+                "description": "Canary Incident custom data connector template",
+                "displayName": "Canary Incident template"
+            }
+        },
+        {
+            "type": "Microsoft.Resources/templateSpecs/versions",
+            "apiVersion": "2021-05-01",
+            "name": "[concat(variables('dataConnectorTemplateSpecName'),'/',variables('dataConnectorVersion'))]",
+            "location": "[parameters('workspace-location')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Resources/templateSpecs', variables('dataConnectorTemplateSpecName'))]",
+                "[resourceId('Microsoft.Insights/dataCollectionEndpoints', variables('dataCollectionEndpointName'))]",
+                "[resourceId('Microsoft.Insights/dataCollectionRules', variables('dataCollectionRuleId'))]"
+            ],
+            "tags": {
+                "hidden-sentinelWorkspaceId": "[variables('workspaceResourceId')]",
+                "hidden-sentinelContentType": "DataConnector"
+            },
+            "properties": {
+                "description": "Canary Incident data connector Template Spec version",
+                "mainTemplate": {
+                    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+                    "contentVersion": "[variables('dataConnectorVersion')]",
+                    "parameters": {
+                        "organizationId": {
+                            "defaultValue": "-NA-",
+                            "type": "string",
+                            "minLength": 1,
+                            "metadata": {
+                                "description": "Organization ID of Canary Endpoint\n\nFor example, `<organizationid>.canary.tools` is the URL of your Canary portal without the `https://` prefix. Enter ONLY the organization ID, not the full URL."
+                            }
+                        },
+                        "apiToken": {
+                            "defaultValue": "-NA-",
+                            "type": "string",
+                            "minLength": 1,
+                            "metadata": {
+                                "description": "API Token for Canary Endpoint"
+                            }
+                        },
+                        "connectorDefinitionName": {
+                            "defaultValue": "Canary Incidents",
+                            "type": "string",
+                            "minLength": 1,
+                            "metadata": {
+                                "description": "connectorDefinitionName"
+                            }
+                        },
+                        "workspace": {
+                            "defaultValue": "[parameters('workspace')]",
+                            "type": "string"
+                        },
+                        "dataCollectionEndpointName": {
+                            "defaultValue": "[variables('dataCollectionEndpointName')]",
+                            "type": "string"
+                        },
+                        "dataCollectionRuleId": {
+                            "defaultValue": "[variables('dataCollectionRuleId')]",
+                            "type": "string"
+                        }
+                    },
+                    "variables": {},
+                    "resources": [
+                        {
+                            "type": "Microsoft.OperationalInsights/workspaces/providers/dataConnectors",
+                            "apiVersion": "2021-10-01-preview",
+                            "name": "[[concat(parameters('workspace'),'/Microsoft.SecurityInsights/', 'CanaryIncidentConnector')]",
+                            "location": "[parameters('workspace-location')]",
+                            "kind": "RestApiPoller",
+                            "properties": {
+                                "connectorDefinitionName": "[[parameters('connectorDefinitionName')]",
+                                "dataType": "[variables('logAnalyticsTableId')]",
+                                "auth": {
+                                    "type": "APIKey",
+                                    "apiKey": "[[parameters('apiToken')]",
+                                    "apiKeyName": "X-Canary-Auth-Token"
+                                },
+                                "request": {
+                                    "apiEndpoint": "[[concat('https://', parameters('organizationId'), '.canary.tools/api/v1/incidents/all')]",
+                                    "httpMethod": "Get",
+                                    "queryTimeFormat": "yyyy-MM-dd-HH:mm:ss",
+                                    "queryWindowInMin": 1,
+                                    "startTimeAttributeName": "newer_than"
+                                },
+                                "response": {
+                                    "eventsJsonPaths": [
+                                        "$..incidents"
+                                    ]
+                                },
+                                "dcrConfig": {
+                                    "streamName": "[concat('Custom-',variables('CanaryIncidentStream'))]",
+                                    "dataCollectionEndpoint": "[[reference(resourceId('Microsoft.Insights/dataCollectionEndpoints', parameters('dataCollectionEndpointName')), '2021-09-01-preview').logsIngestion.endpoint]",
+                                    "dataCollectionRuleImmutableId": "[[reference(resourceId('Microsoft.Insights/dataCollectionRules', parameters('dataCollectionRuleId')), '2021-09-01-preview').immutableId]"
+                                }
+                            }
+                        }
+                    ]
+                }
+            }
+        }
+    ]
+}
