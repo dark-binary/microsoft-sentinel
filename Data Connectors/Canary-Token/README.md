@@ -41,7 +41,7 @@ Once the connector is deployed, you'll need to configure it to connect to your C
 
 ## Known Limitations
 - The data connector can run only every 1 minute (minimum)
-- The data connector uses a query parameter 'newer_than' which is said to be DEPRECATED soon, making the data connector fail. Reference: https://docs.canary.tools/incidents/queries.html#all-incidents
+- The data connector uses a query parameter 'newer_than' which is said to be DEPRECATED soon. Once the query parameter is deprecated the data connector will start failing. Reference: https://docs.canary.tools/incidents/queries.html#all-incidents
 
 ## Troubleshooting
 - If you encounter any issues during deployment or configuration, refer to the Azure Activity Log for detailed error messages.
