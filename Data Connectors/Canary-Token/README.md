@@ -1,4 +1,4 @@
-# Canary Toekn - Polling Data Connector
+# Canary Token - Polling Data Connector
 
 ```
 DO NOT USE THIS DATA CONNECTOR IN PRODUCTION, since it relies on a query parameter (newer_than) in the API endpoint that is soon to be deprecated.
