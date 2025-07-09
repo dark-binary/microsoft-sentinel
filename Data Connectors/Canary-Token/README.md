@@ -1,8 +1,6 @@
 # Canary Token - Polling Data Connector
 
-```
-DO NOT USE THIS DATA CONNECTOR IN PRODUCTION, since it relies on a query parameter (newer_than) in the API endpoint that is soon to be deprecated.
-```
+**DO NOT USE THIS DATA CONNECTOR IN PRODUCTION, since it relies on a query parameter (newer_than) in the API endpoint that is soon to be deprecated.**
 
 This repository contains an ARM (Azure Resource Manager) template for deploying a Codeless Connector for Microsoft Sentinel. This connector allows you to ingest alerts and incidents from **Canary Token** into Microsoft Sentinel.
 
